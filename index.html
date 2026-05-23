@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Gracefully catch and suppress benign Vite WebSocket connection/reconnection errors of the dev sandbox
+      window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason) {
+          const reasonStr = String(event.reason.message || event.reason || '');
+          if (reasonStr.includes('WebSocket') || reasonStr.includes('websocket')) {
+            console.warn('[Vite WS Patch] Prevented benign HMR websocket unhandled rejection:', reasonStr);
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }
+      }, true);
+
+      window.addEventListener('error', function(event) {
+        const msgStr = String(event.message || '');
+        if (msgStr.includes('WebSocket') || msgStr.includes('websocket')) {
+          console.warn('[Vite WS Patch] Prevented benign HMR websocket error:', msgStr);
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }, true);
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

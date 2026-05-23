@@ -1,0 +1,6 @@
+{
+  "name": "CRM Defensa del Consumidor",
+  "description": "Sistema integral de seguimiento de expedientes, control de audiencias y movimientos de Defensa del Consumidor con buscador público y área administrativa.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
