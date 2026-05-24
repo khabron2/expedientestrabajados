@@ -1,14 +1,6 @@
 export type RolUsuario = 'ADMINISTRADOR' | 'OPERADOR' | 'SOLO LECTURA';
 
-export type EstadoExpediente = 
-  | 'INGRESADO' 
-  | 'EN REVISIÓN' 
-  | 'NOTIFICADO' 
-  | 'AUDIENCIA PROGRAMADA' 
-  | 'AUDIENCIA REALIZADA' 
-  | 'PASÓ A JURÍDICO' 
-  | 'RESUELTO' 
-  | 'ARCHIVADO';
+export type EstadoExpediente = string;
 
 export interface Expediente {
   reclamo: string; // N° de Reclamo (Primary Key)

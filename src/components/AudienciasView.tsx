@@ -35,7 +35,9 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
   const selectedDayHearings = useMemo(() => {
     return expedientes.filter(exp => {
       if (!exp.audiencia) return false;
-      const dateStr = formatDate(new Date(exp.audiencia));
+      const d = new Date(exp.audiencia);
+      if (isNaN(d.getTime())) return false;
+      const dateStr = formatDate(d);
       return dateStr === selectedDate;
     });
   }, [expedientes, selectedDate]);
@@ -63,7 +65,9 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
       // Count hearings for this day in actual db state
       const count = expedientes.filter(exp => {
         if (!exp.audiencia) return false;
-        return formatDate(new Date(exp.audiencia)) === dateStr;
+        const dt = new Date(exp.audiencia);
+        if (isNaN(dt.getTime())) return false;
+        return formatDate(dt) === dateStr;
       }).length;
 
       days.push({
@@ -185,7 +189,10 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
             </thead>
             <tbody>
               ${selectedDayHearings.map(h => {
-                const hourStr = new Date(h.audiencia).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + " hs";
+                const parsedDate = new Date(h.audiencia);
+                const hourStr = isNaN(parsedDate.getTime()) 
+                  ? h.audiencia 
+                  : parsedDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + " hs";
                 return `
                   <tr>
                     <td class="time-cell">${hourStr}</td>
@@ -359,7 +366,10 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
               ) : (
                 <div className="space-y-2.5">
                   {selectedDayHearings.map(h => {
-                    const timeStr = new Date(h.audiencia).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + " hs";
+                    const parsedDate = new Date(h.audiencia);
+                    const timeStr = isNaN(parsedDate.getTime())
+                      ? h.audiencia
+                      : parsedDate.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) + " hs";
                     return (
                       <div key={h.reclamo} className="bg-slate-800 p-3 rounded-xl border border-slate-700/60 flex flex-col gap-1.5 hover:bg-slate-750 transition-colors">
                         <div className="flex items-center justify-between gap-2">

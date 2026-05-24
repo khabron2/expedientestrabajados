@@ -7,6 +7,30 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+function formatDisplayDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (!trimmed) return '';
+
+  // If already in YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  // If it's a long date string (e.g., contains "GMT" or letters)
+  const parsed = Date.parse(trimmed);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+
+  return trimmed;
+}
+
 interface ExpedientesCRUDProps {
   currentUserRol: RolUsuario;
   currentUsername: string;
@@ -363,8 +387,8 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
             <div>
               <div class="section-lbl">Estatus de Notificación Cédula</div>
               <div class="section-val" style="font-size: 13px;">
-                Fcha Salida: ${exp.notificacionSale || 'No despachada'}<br>
-                Estado Cédula: ${exp.notificacionVuelta || 'Sin retorno formal'}
+                Fcha Salida: ${formatDisplayDate(exp.notificacionSale) || 'No despachada'}<br>
+                Estado Cédula: ${formatDisplayDate(exp.notificacionVuelta) || 'Sin retorno formal'}
               </div>
             </div>
           </div>
@@ -576,9 +600,8 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                         {exp.estado}
                       </span>
                       {exp.audiencia && (
-                        <div className="text-[9px] text-indigo-600 font-bold mt-1 flex items-center gap-0.5">
-                          <Calendar className="w-2.5 h-2.5" />
-                          Aud: {new Date(exp.audiencia).toLocaleDateString('es-AR')}
+                        <div className="text-[9px] text-slate-500 font-semibold mt-1 flex items-center gap-1 bg-slate-50 px-1 py-0.5 rounded border border-slate-150 max-w-[130px] truncate" title={exp.audiencia}>
+                          <span className="font-extrabold text-blue-600">Obs:</span> {exp.audiencia}
                         </div>
                       )}
                     </td>
@@ -589,10 +612,10 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                         <div>
                           <div className="text-slate-700 font-bold text-[10px] flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                            Sale: {exp.notificacionSale}
+                            Sale: {formatDisplayDate(exp.notificacionSale)}
                           </div>
                           <div className="text-slate-400 text-[9px] font-sans truncate max-w-[130px]" title={exp.notificacionVuelta}>
-                            {exp.notificacionVuelta || 'Sin retorno'}
+                            {formatDisplayDate(exp.notificacionVuelta) || 'Sin retorno'}
                           </div>
                         </div>
                       ) : (
@@ -784,18 +807,15 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                   </div>
 
                   <div>
-                    <label className="block text-slate-700 font-bold mb-1">Fase Inicial del Trámite</label>
-                    <select
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-1 focus:ring-amber-500 outline-none"
+                    <label className="block text-slate-705 text-xs text-slate-600 mb-1 font-bold">Estado del Expediente (Hormiga)*</label>
+                    <input
+                      type="text"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-1 focus:ring-amber-500 focus:bg-white outline-none"
+                      placeholder="ej: INGRESADO, EN REVISIÓN, etc."
                       value={formData.estado}
-                      onChange={(e) => setFormData({ ...formData, estado: e.target.value as EstadoExpediente })}
-                    >
-                      <option value="INGRESADO">INGRESADO</option>
-                      <option value="EN REVISIÓN">EN REVISIÓN</option>
-                      <option value="NOTIFICADO">NOTIFICADO</option>
-                      <option value="AUDIENCIA PROGRAMADA">AUDIENCIA PROGRAMADA</option>
-                      <option value="PASÓ A JURÍDICO">PASÓ A JURÍDICO</option>
-                    </select>
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      required
+                    />
                   </div>
 
                   <div className="col-span-1 sm:col-span-2">
@@ -908,20 +928,14 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-slate-705 text-xs text-slate-600 mb-1">Estado del Expediente (Hormiga)*</label>
-                      <select
+                      <input
+                        type="text"
                         className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-slate-800 focus:ring-1 focus:ring-amber-500 outline-none font-bold text-xs"
+                        placeholder="ej: PASÓ A JURÍDICO, RESUELTO..."
                         value={formData.estado}
-                        onChange={(e) => setFormData({ ...formData, estado: e.target.value as EstadoExpediente })}
-                      >
-                        <option value="INGRESADO">INGRESADO</option>
-                        <option value="EN REVISIÓN">EN REVISIÓN</option>
-                        <option value="NOTIFICADO">NOTIFICADO</option>
-                        <option value="AUDIENCIA PROGRAMADA">AUDIENCIA PROGRAMADA</option>
-                        <option value="AUDIENCIA REALIZADA">AUDIENCIA REALIZADA</option>
-                        <option value="PASÓ A JURÍDICO">PASÓ A JURÍDICO</option>
-                        <option value="RESUELTO">RESUELTO</option>
-                        <option value="ARCHIVADO">ARCHIVADO</option>
-                      </select>
+                        onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                        required
+                      />
                     </div>
 
                     <div>
@@ -990,20 +1004,20 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-700 text-xs mb-1">Estatus Vuelta Cédula</label>
+                    <label className="block text-slate-700 text-xs mb-1">Cédula Vuelta (Fecha)</label>
                     <input
-                      type="text"
-                      placeholder="Ej: Recibido por vigilador"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none text-xs focus:bg-white"
+                      type="date"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs focus:bg-white font-mono"
                       value={formData.notificacionVuelta}
                       onChange={(e) => setFormData({ ...formData, notificacionVuelta: e.target.value })}
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-700 text-xs mb-1">Fecha Audiencia</label>
+                    <label className="block text-slate-700 text-xs mb-1">Observaciones</label>
                     <input
-                      type="datetime-local"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs focus:bg-white font-mono"
+                      type="text"
+                      placeholder="Sin observaciones"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none text-xs focus:bg-white"
                       value={formData.audiencia}
                       onChange={(e) => setFormData({ ...formData, audiencia: e.target.value })}
                     />

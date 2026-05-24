@@ -4,6 +4,30 @@ import { Expediente, Movimiento } from '../types';
 import { Search, ChevronRight, FileText, Calendar, Bell, CheckCircle, ShieldAlert, Clock, ArrowRight, UserCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 
+function formatDisplayDate(dateStr: string | undefined | null): string {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (!trimmed) return '';
+
+  // If already in YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  // If it's a long date string (e.g., contains "GMT" or letters)
+  const parsed = Date.parse(trimmed);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  }
+
+  return trimmed;
+}
+
 interface PublicAreaProps {
   onEnterAdmin: () => void;
 }
@@ -249,7 +273,7 @@ export function PublicArea({ onEnterAdmin }: PublicAreaProps) {
                           <p className="font-sans font-semibold text-slate-800 text-sm mt-1 flex items-center gap-1.5">
                             <span className={`w-2 h-2 rounded-full ${selectedExp.notificacionSale ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
                             {selectedExp.notificacionSale ? 'Enviada' : 'No Procesada'} 
-                            {selectedExp.notificacionSale && <span className="text-slate-400 font-normal text-xs">({selectedExp.notificacionSale})</span>}
+                            {selectedExp.notificacionSale && <span className="text-slate-400 font-normal text-xs">({formatDisplayDate(selectedExp.notificacionSale)})</span>}
                           </p>
                         </div>
                         <div>
@@ -260,14 +284,9 @@ export function PublicArea({ onEnterAdmin }: PublicAreaProps) {
                           </p>
                         </div>
                         <div>
-                          <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">AUDIENCIA CONCILIATORIA</p>
+                          <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">OBSERVACIONES DE LA CAUSA</p>
                           <p className="font-sans font-semibold text-slate-800 text-sm mt-1">
-                            {selectedExp.audiencia ? (
-                              <span className="text-indigo-600 flex items-center gap-1">
-                                <Calendar className="w-3.5 h-3.5" />
-                                {new Date(selectedExp.audiencia).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })} hs
-                              </span>
-                            ) : 'Sin agendar'}
+                            {selectedExp.audiencia || 'Sin observaciones'}
                           </p>
                         </div>
                         <div className="col-span-1 sm:col-span-2">

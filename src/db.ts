@@ -148,6 +148,30 @@ const STORAGE_KEYS = {
   SHEETS_SYNC: 'defcons_crm_sheets_sync_config'
 };
 
+// Parse string to clean YYYY-MM-DD
+export function parseToISODate(value: string | undefined | null): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  // If already in YYYY-MM-DD format, return it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Handle case of "Sat May 23 2026..." or other parseable date
+  const parsed = Date.parse(trimmed);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  return trimmed;
+}
+
 // Simple pseudo-IP helper
 function getSimulatedIP(): string {
   return "190.220." + Math.floor(Math.random() * 255) + "." + Math.floor(Math.random() * 255);
@@ -257,7 +281,8 @@ export class Database {
 
     const dateObj = new Date(dateTimeStr);
     if (isNaN(dateObj.getTime())) {
-      return { valid: false, error: 'Fecha y hora inválidas.' };
+      // Allow general text observations to bypass structured scheduling rules
+      return { valid: true };
     }
 
     // Rule 1: Horas de turnos de 08:00 a 12:00 (las horas válidas comprenden de las 08:00 a las 12:59)
@@ -316,8 +341,13 @@ export class Database {
       if (!val.valid) return { success: false, error: val.error };
     }
 
+    const cleanNotifSale = parseToISODate(expData.notificacionSale);
+    const cleanNotifVuelta = parseToISODate(expData.notificacionVuelta);
+
     const newExpediente: Expediente = {
       ...expData,
+      notificacionSale: cleanNotifSale,
+      notificacionVuelta: cleanNotifVuelta,
       reclamo: expData.reclamo.trim().toUpperCase(),
       fechaActualizacion: new Date().toISOString()
     };
@@ -358,6 +388,14 @@ export class Database {
     }
 
     const expOld = list[idx];
+
+    // Sanitize any date files if being updated
+    if (modFields.notificacionSale !== undefined) {
+      modFields.notificacionSale = parseToISODate(modFields.notificacionSale);
+    }
+    if (modFields.notificacionVuelta !== undefined) {
+      modFields.notificacionVuelta = parseToISODate(modFields.notificacionVuelta);
+    }
 
     // Validate hearing rules if changed
     if (modFields.audiencia && modFields.audiencia !== expOld.audiencia) {
@@ -653,8 +691,8 @@ export class Database {
           denunciada2: String(item.denunciada2 || '').trim(),
           denunciada3: String(item.denunciada3 || '').trim(),
           denunciada4: String(item.denunciada4 || '').trim(),
-          notificacionSale: String(item.notificacionSale || '').trim(),
-          notificacionVuelta: String(item.notificacionVuelta || '').trim(),
+          notificacionSale: parseToISODate(String(item.notificacionSale || '')),
+          notificacionVuelta: parseToISODate(String(item.notificacionVuelta || '')),
           audiencia: String(item.audiencia || '').trim(),
           estado: (String(item.estado || 'INGRESADO').trim().toUpperCase()) as EstadoExpediente,
           usuario: String(item.usuario || 'admin').trim(),

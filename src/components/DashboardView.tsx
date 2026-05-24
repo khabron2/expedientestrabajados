@@ -44,7 +44,9 @@ export function DashboardView() {
     const targetTodayStr = "2026-05-22"; // We simulate the peak day in mock data (May 22, 2026 is scheduled)
     const audienciasHoy = filteredExpedientes.filter(e => {
       if (!e.audiencia) return false;
-      return formatDate(new Date(e.audiencia)) === targetTodayStr;
+      const d = new Date(e.audiencia);
+      if (isNaN(d.getTime())) return false;
+      return formatDate(d) === targetTodayStr;
     }).length;
 
     // Cantidad de notificaciones programadas-enviadas
