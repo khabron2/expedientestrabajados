@@ -36,23 +36,70 @@ export function cleanLegacyDateToEmpty(val: string | undefined | null): string {
   const trimmed = val.trim();
   if (!trimmed) return '';
 
-  // Check if it matches a standard date structure or legacy date string from scheduling
-  const isLegacyDate = 
+  // If already in standard ISO format: YYYY-MM-DDTHH:MM
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // If YYYY-MM-DD format (missing time part), keep it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Support Spanish/Argentine style DD/MM/YYYY or DD/MM/YYYY HH:MM:ss
+  const dmYMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?)?/);
+  if (dmYMatch) {
+    const [_, day, month, year, hours, mins] = dmYMatch;
+    const cleanDay = day.padStart(2, '0');
+    const cleanMonth = month.padStart(2, '0');
+    if (hours && mins) {
+      const cleanHours = hours.padStart(2, '0');
+      const cleanMins = mins.padStart(2, '0');
+      return `${year}-${cleanMonth}-${cleanDay}T${cleanHours}:${cleanMins}`;
+    }
+    return `${year}-${cleanMonth}-${cleanDay}`;
+  }
+
+  // If it's a standard/legacy full date string with time zone information
+  const isLegacyJSString = 
     trimmed.includes('GMT') || 
     trimmed.includes('UTC') || 
     trimmed.includes('estándar') || 
     trimmed.includes('Standard') ||
-    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed);
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed);
 
-  if (isLegacyDate) {
+  if (isLegacyJSString) {
     const ms = Date.parse(trimmed);
     if (!isNaN(ms)) {
-      return '';
+      const d = new Date(ms);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      if (hours === '00' && mins === '00') {
+        return `${year}-${month}-${day}`;
+      }
+      return `${year}-${month}-${day}T${hours}:${mins}`;
     }
+    return '';
   }
+
+  // Fallback parsed formatting
+  const msFallback = Date.parse(trimmed);
+  if (!isNaN(msFallback)) {
+    const d = new Date(msFallback);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    if (hours === '00' && mins === '00') {
+      return `${year}-${month}-${day}`;
+    }
+    return `${year}-${month}-${day}T${hours}:${mins}`;
+  }
+
   return trimmed;
 }
 
@@ -412,8 +459,8 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
             <div>
               <div class="section-lbl">Estatus de Notificación Cédula</div>
               <div class="section-val" style="font-size: 13px;">
-                Fcha Salida: ${formatDisplayDate(exp.notificacionSale) || 'No despachada'}<br>
-                Estado Cédula: ${formatDisplayDate(exp.notificacionVuelta) || 'Sin retorno formal'}
+                Sale: ${formatDisplayDate(exp.notificacionSale) || 'No despachada'}<br>
+                Notificado: ${formatDisplayDate(exp.notificacionVuelta) || 'Sin retorno formal'}
               </div>
             </div>
           </div>
@@ -634,13 +681,14 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                     {/* Notification info */}
                     <td className="py-3.5 px-4">
                       {exp.notificacionSale ? (
-                        <div>
+                        <div className="space-y-1">
                           <div className="text-slate-700 font-bold text-[10px] flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
                             Sale: {formatDisplayDate(exp.notificacionSale)}
                           </div>
-                          <div className="text-slate-400 text-[9px] font-sans truncate max-w-[130px]" title={exp.notificacionVuelta}>
-                            {formatDisplayDate(exp.notificacionVuelta) || 'Sin retorno'}
+                          <div className="text-slate-700 font-bold text-[10px] flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                            Notificado: {formatDisplayDate(exp.notificacionVuelta) || 'Sin retorno'}
                           </div>
                         </div>
                       ) : (

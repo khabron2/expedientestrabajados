@@ -16,6 +16,25 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
 
   useEffect(() => {
     setExpedientes(Database.getExpedientes());
+
+    // Automatically trigger transparent Google Sheets pull upon entering the section
+    let active = true;
+    const autoSyncFromSheets = async () => {
+      try {
+        const res = await Database.pullFromGoogleSheets();
+        if (active && res.success && res.count > 0) {
+          setExpedientes(Database.getExpedientes());
+        }
+      } catch (err) {
+        console.warn("[AudienciasView] No se pudo autosincronizar con Google Sheets:", err);
+      }
+    };
+
+    autoSyncFromSheets();
+
+    return () => {
+      active = false;
+    };
   }, [syncTrigger]);
   const [selectedDate, setSelectedDate] = useState<string>("2026-05-22"); // Default to pre-seeded date in May 2026
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -25,6 +44,8 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
   const [targetTime, setTargetTime] = useState('09:00'); // HH:MM
 
   const isReadOnly = currentUserRol === 'SOLO LECTURA';
+
+  const hourBlocks = [8, 9, 10, 11, 12];
 
   // Real-time reloading
   const reloadData = () => {
@@ -41,6 +62,13 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
       return dateStr === selectedDate;
     });
   }, [expedientes, selectedDate]);
+
+  const getHearingsForHour = (hourNum: number) => {
+    return selectedDayHearings.filter(h => {
+      const d = new Date(h.audiencia);
+      return !isNaN(d.getTime()) && d.getHours() === hourNum;
+    });
+  };
 
   // Calendar dates generator for May 2026 (Argentine layout starting on Sunday or Monday)
   // May 1st 2026 is a Friday.
@@ -357,6 +385,43 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
               <p className="font-mono text-xs text-slate-300 mt-0.5">{selectedDate}</p>
             </div>
 
+            {/* Hourly block indicator mapping */}
+            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700/50 space-y-3">
+              <h4 className="text-[10px] uppercase font-mono tracking-wider text-amber-400 flex items-center justify-between">
+                <span>BLOQUES DE HORAS (08:00 A 12:00 HS)</span>
+                <span className="text-[9px] font-sans text-slate-400 font-normal">Capacidad: 2 por hora</span>
+              </h4>
+              <div className="grid grid-cols-5 gap-2">
+                {hourBlocks.map(hr => {
+                  const items = getHearingsForHour(hr);
+                  const count = items.length;
+                  const isFull = count >= 2;
+                  
+                  return (
+                    <div 
+                      key={hr} 
+                      className={`p-1.5 rounded-lg border text-center flex flex-col justify-between items-center transition-all ${
+                        isFull 
+                          ? 'bg-rose-950/25 border-rose-800/60 text-rose-300' 
+                          : count === 1 
+                            ? 'bg-amber-950/25 border-amber-800/40 text-amber-200' 
+                            : 'bg-slate-850 border-slate-705/30 text-slate-400'
+                      }`}
+                    >
+                      <span className="font-mono text-[10px] font-bold block">{String(hr).padStart(2, '0')}:00</span>
+                      <div className="flex gap-1 mt-1.5 justify-center">
+                        <span className={`w-2 h-2 rounded-full inline-block ${count >= 1 ? (isFull ? 'bg-rose-500' : 'bg-amber-500') : 'bg-slate-700'}`}></span>
+                        <span className={`w-2 h-2 rounded-full inline-block ${count >= 2 ? 'bg-rose-500' : 'bg-slate-700'}`}></span>
+                      </div>
+                      <span className="text-[8px] font-sans mt-1.5 opacity-80 uppercase font-black tracking-tight">
+                        {isFull ? 'lleno' : count === 1 ? '1/2' : 'libre'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* List of scheduled acts for that date */}
             <div className="space-y-3">
               <h4 className="text-[10px] uppercase font-mono tracking-wider text-slate-400">Audiencias programadas ({selectedDayHearings.length}/10 de cupo)</h4>
@@ -476,6 +541,35 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
                   required
                 />
                 <p className="text-[10px] text-slate-400 mt-1">Horario reglamentario válido: entre las 08:00 y las 12:00 hs.</p>
+              </div>
+
+              {/* Visual Slot Availability */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <span className="block text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Estado de turnos para el {selectedDate}:</span>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {hourBlocks.map(hr => {
+                    const count = getHearingsForHour(hr).length;
+                    const isFull = count >= 2;
+                    return (
+                      <div 
+                        key={hr}
+                        className={`p-1.5 rounded-lg border text-center transition-all ${
+                          isFull 
+                            ? 'bg-rose-50 border-rose-200 text-rose-700 font-bold' 
+                            : count === 1 
+                              ? 'bg-amber-50 border-amber-200 text-amber-700 font-semibold' 
+                              : 'bg-white border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <span className="font-mono text-[9px] block">{String(hr).padStart(2, '0')}:00</span>
+                        <div className="flex gap-0.5 justify-center mt-1">
+                          <span className={`w-1.5 h-1.5 rounded-full inline-block ${count >= 1 ? (isFull ? 'bg-rose-500' : 'bg-amber-500') : 'bg-slate-300'}`}></span>
+                          <span className={`w-1.5 h-1.5 rounded-full inline-block ${count >= 2 ? 'bg-rose-500' : 'bg-slate-300'}`}></span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Action submits */}

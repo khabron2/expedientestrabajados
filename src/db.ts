@@ -47,6 +47,78 @@ export function parseToISODate(value: string | undefined | null): string {
   return trimmed;
 }
 
+export function cleanLegacyDateToEmpty(val: string | undefined | null): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+
+  // If already in standard ISO format: YYYY-MM-DDTHH:MM
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // If YYYY-MM-DD format (missing time part), keep it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Support Spanish/Argentine style DD/MM/YYYY or DD/MM/YYYY HH:MM:ss
+  const dmYMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?)?/);
+  if (dmYMatch) {
+    const [_, day, month, year, hours, mins] = dmYMatch;
+    const cleanDay = day.padStart(2, '0');
+    const cleanMonth = month.padStart(2, '0');
+    if (hours && mins) {
+      const cleanHours = hours.padStart(2, '0');
+      const cleanMins = mins.padStart(2, '0');
+      return `${year}-${cleanMonth}-${cleanDay}T${cleanHours}:${cleanMins}`;
+    }
+    return `${year}-${cleanMonth}-${cleanDay}`;
+  }
+
+  // If it's a standard/legacy full date string with time zone information
+  const isLegacyJSString = 
+    trimmed.includes('GMT') || 
+    trimmed.includes('UTC') || 
+    trimmed.includes('estándar') || 
+    trimmed.includes('Standard') ||
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed);
+
+  if (isLegacyJSString) {
+    const ms = Date.parse(trimmed);
+    if (!isNaN(ms)) {
+      const d = new Date(ms);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      if (hours === '00' && mins === '00') {
+        return `${year}-${month}-${day}`;
+      }
+      return `${year}-${month}-${day}T${hours}:${mins}`;
+    }
+    return '';
+  }
+
+  // Fallback parsed formatting
+  const msFallback = Date.parse(trimmed);
+  if (!isNaN(msFallback)) {
+    const d = new Date(msFallback);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    if (hours === '00' && mins === '00') {
+      return `${year}-${month}-${day}`;
+    }
+    return `${year}-${month}-${day}T${hours}:${mins}`;
+  }
+
+  return trimmed;
+}
+
 // Simple pseudo-IP helper
 function getSimulatedIP(): string {
   return "190.220." + Math.floor(Math.random() * 255) + "." + Math.floor(Math.random() * 255);
@@ -91,7 +163,20 @@ export class Database {
 
   // --- GETTERS ---
   static getExpedientes(): Expediente[] {
-    return this.getStored<Expediente[]>(STORAGE_KEYS.EXPEDIENTES, INITIAL_EXPEDIENTES);
+    const list = this.getStored<Expediente[]>(STORAGE_KEYS.EXPEDIENTES, INITIAL_EXPEDIENTES);
+    let upgraded = false;
+    const cleaned = list.map(e => {
+      const cleanAud = cleanLegacyDateToEmpty(e.audiencia);
+      if (cleanAud !== e.audiencia) {
+        upgraded = true;
+        return { ...e, audiencia: cleanAud };
+      }
+      return e;
+    });
+    if (upgraded) {
+      this.setStored(STORAGE_KEYS.EXPEDIENTES, cleaned);
+    }
+    return cleaned;
   }
 
   static getMovimientos(): Movimiento[] {
@@ -218,11 +303,13 @@ export class Database {
 
     const cleanNotifSale = parseToISODate(expData.notificacionSale);
     const cleanNotifVuelta = parseToISODate(expData.notificacionVuelta);
+    const cleanAudiencia = cleanLegacyDateToEmpty(expData.audiencia);
 
     const newExpediente: Expediente = {
       ...expData,
       notificacionSale: cleanNotifSale,
       notificacionVuelta: cleanNotifVuelta,
+      audiencia: cleanAudiencia,
       reclamo: expData.reclamo.trim().toUpperCase(),
       fechaActualizacion: new Date().toISOString()
     };
@@ -270,6 +357,9 @@ export class Database {
     }
     if (modFields.notificacionVuelta !== undefined) {
       modFields.notificacionVuelta = parseToISODate(modFields.notificacionVuelta);
+    }
+    if (modFields.audiencia !== undefined) {
+      modFields.audiencia = cleanLegacyDateToEmpty(modFields.audiencia);
     }
 
     // Validate hearing rules if changed
@@ -568,7 +658,7 @@ export class Database {
           denunciada4: String(item.denunciada4 || '').trim(),
           notificacionSale: parseToISODate(String(item.notificacionSale || '')),
           notificacionVuelta: parseToISODate(String(item.notificacionVuelta || '')),
-          audiencia: String(item.audiencia || '').trim(),
+          audiencia: cleanLegacyDateToEmpty(String(item.audiencia || '').trim()),
           estado: (String(item.estado || 'INGRESADO').trim().toUpperCase()) as EstadoExpediente,
           usuario: String(item.usuario || 'admin').trim(),
           fechaActualizacion: String(item.fechaActualizacion || new Date().toISOString()).trim()

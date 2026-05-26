@@ -33,22 +33,70 @@ function cleanLegacyDateToEmpty(val: string | undefined | null): string {
   const trimmed = val.trim();
   if (!trimmed) return '';
 
-  const isLegacyDate = 
+  // If already in standard ISO format: YYYY-MM-DDTHH:MM
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // If YYYY-MM-DD format (missing time part), keep it
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Support Spanish/Argentine style DD/MM/YYYY or DD/MM/YYYY HH:MM:ss
+  const dmYMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::\d{1,2})?)?/);
+  if (dmYMatch) {
+    const [_, day, month, year, hours, mins] = dmYMatch;
+    const cleanDay = day.padStart(2, '0');
+    const cleanMonth = month.padStart(2, '0');
+    if (hours && mins) {
+      const cleanHours = hours.padStart(2, '0');
+      const cleanMins = mins.padStart(2, '0');
+      return `${year}-${cleanMonth}-${cleanDay}T${cleanHours}:${cleanMins}`;
+    }
+    return `${year}-${cleanMonth}-${cleanDay}`;
+  }
+
+  // If it's a standard/legacy full date string with time zone information
+  const isLegacyJSString = 
     trimmed.includes('GMT') || 
     trimmed.includes('UTC') || 
     trimmed.includes('estándar') || 
     trimmed.includes('Standard') ||
-    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(trimmed) ||
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed);
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed);
 
-  if (isLegacyDate) {
+  if (isLegacyJSString) {
     const ms = Date.parse(trimmed);
     if (!isNaN(ms)) {
-      return '';
+      const d = new Date(ms);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      if (hours === '00' && mins === '00') {
+        return `${year}-${month}-${day}`;
+      }
+      return `${year}-${month}-${day}T${hours}:${mins}`;
     }
+    return '';
   }
+
+  // Fallback parsed formatting
+  const msFallback = Date.parse(trimmed);
+  if (!isNaN(msFallback)) {
+    const d = new Date(msFallback);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    if (hours === '00' && mins === '00') {
+      return `${year}-${month}-${day}`;
+    }
+    return `${year}-${month}-${day}T${hours}:${mins}`;
+  }
+
   return trimmed;
 }
 
@@ -308,11 +356,16 @@ export function PublicArea({ onEnterAdmin, isBootSyncing = false }: PublicAreaPr
                         </div>
                         <div>
                           <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">NOTIFICACIÓN SUMARIA</p>
-                          <p className="font-sans font-semibold text-slate-800 text-sm mt-1 flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${selectedExp.notificacionSale ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-                            {selectedExp.notificacionSale ? 'Enviada' : 'No Procesada'} 
-                            {selectedExp.notificacionSale && <span className="text-slate-400 font-normal text-xs">({formatDisplayDate(selectedExp.notificacionSale)})</span>}
-                          </p>
+                          <div className="mt-1 space-y-1">
+                            <p className="font-sans font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${selectedExp.notificacionSale ? 'bg-purple-500' : 'bg-slate-300'}`}></span>
+                              Sale: {formatDisplayDate(selectedExp.notificacionSale) || 'No despachada'}
+                            </p>
+                            <p className="font-sans font-semibold text-slate-800 text-sm flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${selectedExp.notificacionVuelta ? 'bg-indigo-500' : 'bg-slate-300'}`}></span>
+                              Notificado: {formatDisplayDate(selectedExp.notificacionVuelta) || 'Sin retorno formal'}
+                            </p>
+                          </div>
                         </div>
                         <div>
                           <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">ÁREA JURÍDICA</p>
