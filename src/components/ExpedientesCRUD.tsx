@@ -31,6 +31,31 @@ function formatDisplayDate(dateStr: string | undefined | null): string {
   return trimmed;
 }
 
+export function cleanLegacyDateToEmpty(val: string | undefined | null): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+
+  // Check if it matches a standard date structure or legacy date string from scheduling
+  const isLegacyDate = 
+    trimmed.includes('GMT') || 
+    trimmed.includes('UTC') || 
+    trimmed.includes('estándar') || 
+    trimmed.includes('Standard') ||
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed);
+
+  if (isLegacyDate) {
+    const ms = Date.parse(trimmed);
+    if (!isNaN(ms)) {
+      return '';
+    }
+  }
+  return trimmed;
+}
+
 interface ExpedientesCRUDProps {
   currentUserRol: RolUsuario;
   currentUsername: string;
@@ -192,7 +217,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
       denunciada4: exp.denunciada4,
       notificacionSale: exp.notificacionSale,
       notificacionVuelta: exp.notificacionVuelta,
-      audiencia: exp.audiencia,
+      audiencia: cleanLegacyDateToEmpty(exp.audiencia),
       estado: exp.estado
     });
     setObservacionesEstado('');
@@ -599,7 +624,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                       <span className={`px-2.5 py-1 text-[9px] font-extrabold tracking-wider rounded-lg border uppercase inline-block ${getStatusBadge(exp.estado)}`}>
                         {exp.estado}
                       </span>
-                      {exp.audiencia && (
+                      {cleanLegacyDateToEmpty(exp.audiencia) && (
                         <div className="text-[9px] text-slate-500 font-semibold mt-1 flex items-center gap-1 bg-slate-50 px-1 py-0.5 rounded border border-slate-150 max-w-[130px] truncate" title={exp.audiencia}>
                           <span className="font-extrabold text-blue-600">Obs:</span> {exp.audiencia}
                         </div>

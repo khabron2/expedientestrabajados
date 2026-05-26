@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Database } from '../db';
 import { Expediente, Movimiento } from '../types';
-import { Search, ChevronRight, FileText, Calendar, Bell, CheckCircle, ShieldAlert, Clock, ArrowRight, UserCheck } from 'lucide-react';
+import { Search, ChevronRight, FileText, Calendar, Bell, CheckCircle, ShieldAlert, Clock, ArrowRight, UserCheck, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
 
 function formatDisplayDate(dateStr: string | undefined | null): string {
@@ -28,11 +28,36 @@ function formatDisplayDate(dateStr: string | undefined | null): string {
   return trimmed;
 }
 
-interface PublicAreaProps {
-  onEnterAdmin: () => void;
+function cleanLegacyDateToEmpty(val: string | undefined | null): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+
+  const isLegacyDate = 
+    trimmed.includes('GMT') || 
+    trimmed.includes('UTC') || 
+    trimmed.includes('estándar') || 
+    trimmed.includes('Standard') ||
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun|Lun|Mar|Mié|Jue|Vie|Sáb|Dom)\s[A-Za-z]{3}\s\d{1,2}\s\d{4}/i.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(trimmed) ||
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed);
+
+  if (isLegacyDate) {
+    const ms = Date.parse(trimmed);
+    if (!isNaN(ms)) {
+      return '';
+    }
+  }
+  return trimmed;
 }
 
-export function PublicArea({ onEnterAdmin }: PublicAreaProps) {
+interface PublicAreaProps {
+  onEnterAdmin: () => void;
+  isBootSyncing?: boolean;
+}
+
+export function PublicArea({ onEnterAdmin, isBootSyncing = false }: PublicAreaProps) {
   const [query, setQuery] = useState('');
   const [searched, setSearched] = useState(false);
   const [results, setResults] = useState<Expediente[]>([]);
@@ -118,7 +143,20 @@ export function PublicArea({ onEnterAdmin }: PublicAreaProps) {
           </div>
           <div>
             <h1 className="font-sans font-bold text-slate-900 tracking-tight text-lg">Defensa del Consumidor</h1>
-            <p className="font-mono text-[10px] text-slate-500 tracking-widest uppercase">Consulta de expedientes pública</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="font-mono text-[10px] text-slate-500 tracking-widest uppercase">Consulta de expedientes pública</p>
+              {isBootSyncing ? (
+                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-200 animate-pulse font-sans">
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Conectando...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-emerald-200 font-sans">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span className="w-1 h-1 rounded-full bg-emerald-500 absolute"></span>
+                  Online
+                </span>
+              )}
+            </div>
           </div>
         </div>
         
@@ -286,7 +324,7 @@ export function PublicArea({ onEnterAdmin }: PublicAreaProps) {
                         <div>
                           <p className="font-mono text-[10px] text-slate-400 uppercase tracking-wider">OBSERVACIONES DE LA CAUSA</p>
                           <p className="font-sans font-semibold text-slate-800 text-sm mt-1">
-                            {selectedExp.audiencia || 'Sin observaciones'}
+                            {cleanLegacyDateToEmpty(selectedExp.audiencia) || 'Sin observaciones'}
                           </p>
                         </div>
                         <div className="col-span-1 sm:col-span-2">

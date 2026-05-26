@@ -51,6 +51,7 @@ export default function App() {
   });
   const [syncTrigger, setSyncTrigger] = useState<number>(0);
   const [isSyncingBg, setIsSyncingBg] = useState<boolean>(false);
+  const [isBootSyncing, setIsBootSyncing] = useState<boolean>(true);
 
   useEffect(() => {
     localStorage.setItem('defcons_crm_auto_sync_1m', String(autoSync1m));
@@ -96,41 +97,37 @@ export default function App() {
     localStorage.setItem('defcons_crm_dark_mode', String(isDarkMode));
   }, [isDarkMode]);
 
-  // Automatic startup pull from Google Sheets if the database is ever empty
+  // Automatic startup pull from Google Sheets to ensure the freshest official data is available
   useEffect(() => {
-    const finalExp = Database.getExpedientes();
-    if (finalExp.length === 0) {
-      console.log("[Boot] Base de datos vacía. Sincronizando datos oficiales desde Google Sheet...");
-      Database.pullFromGoogleSheets().then((res) => {
+    const runStartupSync = async () => {
+      setIsBootSyncing(true);
+      console.log("[Boot] Iniciando descarga transparente de expedientes desde Google Sheets...");
+      try {
+        const res = await Database.pullFromGoogleSheets();
         if (res.success && res.count > 0) {
-          addToast(`¡Sincronización inicial automática exitosa! Se cargaron ${res.count} expedientes desde Google Sheets.`, 'success');
-          // Also pull users automatically so they are ready for login!
-          Database.pullUsersFromGoogleSheets().then((resUsers) => {
-            if (resUsers.success) {
-              console.log(`[Boot] Se pre-cargaron ${resUsers.count} usuarios de la planilla.`);
-              setHasSimulatedAccounts(true);
-            }
-          }).catch(err => console.warn("[Boot] Auto-fetch users warning", err));
+          setSyncTrigger(prev => prev + 1);
+          console.log(`[Boot] Sincronización automática de expedientes exitosa: ${res.count} cargados.`);
+        }
+      } catch (err) {
+        console.warn("[Boot] Error en sincronización silenciosa inicial de expedientes", err);
+      }
 
-          setTimeout(() => {
-            window.location.reload();
-          }, 1200);
-        }
-      }).catch(err => {
-        console.warn("[Boot] Auto-fetch error caught safely", err);
-      });
-    } else {
-      // Silently and transparently fetch the latest Google Sheets users on application load
       console.log("[Boot] Descargando de forma transparente los usuarios oficiales de la planilla...");
-      Database.pullUsersFromGoogleSheets().then((resUsers) => {
+      try {
+        const resUsers = await Database.pullUsersFromGoogleSheets();
         if (resUsers.success && resUsers.count > 0) {
-          console.log(`[Boot] Sincronización automática de usuarios exitosa: ${resUsers.count} cargados.`);
+          console.log(`[Boot] Sincronización de usuarios exitosa: ${resUsers.count} cargados.`);
           setHasSimulatedAccounts(true);
+          setSyncTrigger(prev => prev + 1);
         }
-      }).catch(err => {
-        console.warn("[Boot] No se completó la descarga automática de usuarios silenciosa", err);
-      });
-    }
+      } catch (err) {
+        console.warn("[Boot] No se completó la descarga silenciosa inicial de usuarios", err);
+      } finally {
+        setIsBootSyncing(false);
+      }
+    };
+
+    runStartupSync();
   }, []);
 
   // Toast adder utility
@@ -199,6 +196,7 @@ export default function App() {
             className="w-full"
           >
             <PublicArea 
+              isBootSyncing={isBootSyncing}
               onEnterAdmin={() => {
                 Database.logout();
                 setSession(null);
