@@ -38,9 +38,6 @@ export default function App() {
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [hasSimulatedAccounts, setHasSimulatedAccounts] = useState(() => 
-    Database.getUsuarios().some(u => ['admin', 'operador', 'lector'].includes(u.username.toLowerCase()))
-  );
 
   // Toast stack state
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -117,7 +114,6 @@ export default function App() {
         const resUsers = await Database.pullUsersFromGoogleSheets();
         if (resUsers.success && resUsers.count > 0) {
           console.log(`[Boot] Sincronización de usuarios exitosa: ${resUsers.count} cargados.`);
-          setHasSimulatedAccounts(true);
           setSyncTrigger(prev => prev + 1);
         }
       } catch (err) {
@@ -200,9 +196,6 @@ export default function App() {
               onEnterAdmin={() => {
                 Database.logout();
                 setSession(null);
-                setHasSimulatedAccounts(
-                  Database.getUsuarios().some(u => ['admin', 'operador', 'lector'].includes(u.username.toLowerCase()))
-                );
                 setShowLoginModal(true);
               }}
             />
@@ -613,38 +606,6 @@ export default function App() {
                 <p className="text-slate-500 text-xs">Ingrese las credenciales del operador para la gestión de audiencias e imputaciones formales.</p>
               </div>
 
-              {/* Login instructions */}
-              {hasSimulatedAccounts && (
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 mb-4 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="font-bold text-slate-700 flex items-center gap-1">
-                      <AlertCircle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      Cuentas habilitadas (Pruebas):
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const defaultUsernames = ['admin', 'operador', 'lector'];
-                        const current = Database.getUsuarios();
-                        const filtered = current.filter(u => !defaultUsernames.includes(u.username.toLowerCase()));
-                        Database.saveUsuarios(filtered);
-                        setHasSimulatedAccounts(false);
-                        addToast('Se han eliminado las cuentas simuladas por defecto. Ahora solo puede iniciar sesión con usuarios oficiales.', 'success');
-                      }}
-                      className="text-[9px] font-extrabold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
-                      title="Quitar las cuentas simuladas por defecto de la memoria local"
-                    >
-                      Limpiar simulados
-                    </button>
-                  </div>
-                  <div className="font-mono text-[10px] text-slate-600 space-y-0.5 leading-relaxed border-t border-slate-200/60 pt-1.5">
-                    <div>• Admin: <span className="font-bold">admin</span> / clave: <span className="font-bold">1234</span></div>
-                    <div>• Operador: <span className="font-bold">operador</span> / clave: <span className="font-bold">1234</span></div>
-                    <div>• Lector: <span className="font-bold">lector</span> / clave: <span className="font-bold">1234</span></div>
-                  </div>
-                </div>
-              )}
-
               {/* Login Form */}
               <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
                 
@@ -711,7 +672,6 @@ export default function App() {
                         const dbUsers = Database.getUsuarios();
                         const usernamesList = dbUsers.map(u => u.username).join(', ');
                         addToast(`¡Sincronización exitosa! Se cargaron ${res.count} cuentas oficiales habilitadas (${usernamesList}).`, 'success');
-                        setHasSimulatedAccounts(true);
                       } else {
                         setLoginError(res.error || 'No se han podido descargar los operadores habilitados de la planilla.');
                       }
