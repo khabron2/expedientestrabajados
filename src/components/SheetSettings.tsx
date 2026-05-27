@@ -123,7 +123,7 @@ function doGet(e) {
       var lastRow = sheet.getLastRow();
       if (lastRow > 1) {
         var headers = [
-          "RECLAMO", "APELLIDO", "NOMBRE", "DNI", "TELEFONO", "LOCALIDAD", "RUBRO", 
+          "RECLAMO", "APELLIDO", "NOMBRE", "DNI", "TELEFONO", "LOCALIDAD", "RUBRO", "CATEGORIA", 
           "MOTIVOS", "DENUNCIADA 1", "DENUNCIADA 2", "DENUNCIADA 3", "DENUNCIADA 4", 
           "NOTIFICACION SALE", "NOTIFICACIÓN VUELTA", "AUDIENCIA", "ESTADO DEL EXPEDIENTE", 
           "USUARIO", "FECHA ACTUALIZACION"
@@ -139,17 +139,18 @@ function doGet(e) {
             telefono: String(row[4] || ""),
             localidad: String(row[5] || ""),
             rubro: String(row[6] || ""),
-            motivos: String(row[7] || ""),
-            denunciada1: String(row[8] || ""),
-            denunciada2: String(row[9] || ""),
-            denunciada3: String(row[10] || ""),
-            denunciada4: String(row[11] || ""),
-            notificacionSale: String(row[12] || ""),
-            notificacionVuelta: String(row[13] || ""),
-            audiencia: String(row[14] || ""),
-            estado: String(row[15] || ""),
-            usuario: String(row[16] || ""),
-            fechaActualizacion: String(row[17] || "")
+            categoria: String(row[7] || ""),
+            motivos: String(row[8] || ""),
+            denunciada1: String(row[9] || ""),
+            denunciada2: String(row[10] || ""),
+            denunciada3: String(row[11] || ""),
+            denunciada4: String(row[12] || ""),
+            notificacionSale: String(row[13] || ""),
+            notificacionVuelta: String(row[14] || ""),
+            audiencia: String(row[15] || ""),
+            estado: String(row[16] || ""),
+            usuario: String(row[17] || ""),
+            fechaActualizacion: String(row[18] || "")
           });
         }
       }
@@ -327,7 +328,7 @@ function doPost(e) {
     }
     
     var headers = [
-      "RECLAMO", "APELLIDO", "NOMBRE", "DNI", "TELEFONO", "LOCALIDAD", "RUBRO", 
+      "RECLAMO", "APELLIDO", "NOMBRE", "DNI", "TELEFONO", "LOCALIDAD", "RUBRO", "CATEGORIA", 
       "MOTIVOS", "DENUNCIADA 1", "DENUNCIADA 2", "DENUNCIADA 3", "DENUNCIADA 4", 
       "NOTIFICACION SALE", "NOTIFICACIÓN VUELTA", "AUDIENCIA", "ESTADO DEL EXPEDIENTE", 
       "USUARIO", "FECHA ACTUALIZACION"
@@ -354,6 +355,7 @@ function doPost(e) {
         exp.telefono || "",
         exp.localidad || "",
         exp.rubro || "",
+        exp.categoria || "",
         exp.motivos || "",
         exp.denunciada1 || "",
         exp.denunciada2 || "",
@@ -547,16 +549,18 @@ function doPost(e) {
               <span className="bg-white px-2 py-1 rounded border shadow-xs">[E] TELEFONO</span>
               <span className="bg-white px-2 py-1 rounded border shadow-xs">[F] LOCALIDAD</span>
               <span className="bg-white px-2 py-1 rounded border shadow-xs">[G] RUBRO</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[H] MOTIVOS</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[I] DENUNCIADA 1</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[J] DENUNCIADA 2</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[K] DENUNCIADA 3</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[L] DENUNCIADA 4</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[M] NOTIFICACION SALE</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[N] NOTIFICACIÓN VUELTA</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[O] AUDIENCIA</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[P] ESTADO DEL EXPEDIENTE</span>
-              <span className="bg-white px-2 py-1 rounded border shadow-xs">[Q] USUARIO</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[H] CATEGORIA</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[I] MOTIVOS</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[J] DENUNCIADA 1</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[K] DENUNCIADA 2</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[L] DENUNCIADA 3</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[M] DENUNCIADA 4</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[N] NOTIFICACION SALE</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[O] NOTIFICACIÓN VUELTA</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[P] AUDIENCIA</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[Q] ESTADO DEL EXPEDIENTE</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[R] USUARIO</span>
+              <span className="bg-white px-2 py-1 rounded border shadow-xs">[S] FECHA ACTUALIZACION</span>
             </div>
 
             <div className="p-3.5 bg-indigo-50 border border-indigo-150 rounded-xl flex gap-3 text-xs text-indigo-800">

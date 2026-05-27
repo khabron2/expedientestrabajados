@@ -142,30 +142,29 @@ export function PublicArea({ onEnterAdmin, isBootSyncing = false }: PublicAreaPr
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'INGRESADO': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'EN REVISIÓN': return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'NOTIFICADO': return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'AUDIENCIA PROGRAMADA': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
-      case 'AUDIENCIA REALIZADA': return 'bg-teal-50 text-teal-700 border-teal-200';
-      case 'PASÓ A JURÍDICO': return 'bg-rose-50 text-rose-700 border-rose-200';
-      case 'RESUELTO': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'ARCHIVADO': return 'bg-gray-50 text-gray-700 border-gray-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
+    const s = (status || '').toUpperCase().trim();
+    if (s === 'INGRESADO') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (s === 'EN REVISIÓN' || s === 'EN REVISION') return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (s === 'NOTIFICADO') return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (s === 'AUDIENCIA PROGRAMADA') return 'bg-indigo-50 text-indigo-700 border-indigo-200';
+    if (s === 'AUDIENCIA REALIZADA') return 'bg-teal-50 text-teal-700 border-teal-200';
+    if (s === 'PASÓ A JURÍDICO' || s === 'PASO A JURIDICO' || s.includes('JURÍDIC') || s.includes('JURIDIC')) return 'bg-rose-50 text-rose-700 border-rose-200';
+    if (s === 'RESUELTO' || s.includes('RESUELT')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (s === 'ARCHIVADO' || s.includes('ARCHIV')) return 'bg-gray-50 text-gray-700 border-gray-200';
+    return 'bg-gray-50 text-gray-700 border-gray-200';
   };
 
   const getStatusBadgeDot = (status: string) => {
-    switch (status) {
-      case 'INGRESADO': return 'bg-blue-500';
-      case 'EN REVISIÓN': return 'bg-amber-500';
-      case 'NOTIFICADO': return 'bg-purple-500';
-      case 'AUDIENCIA PROGRAMADA': return 'bg-indigo-500';
-      case 'AUDIENCIA REALIZADA': return 'bg-teal-500';
-      case 'PASÓ A JURÍDICO': return 'bg-rose-500';
-      case 'RESUELTO': return 'bg-emerald-500';
-      default: return 'bg-gray-400';
-    }
+    const s = (status || '').toUpperCase().trim();
+    if (s === 'INGRESADO') return 'bg-blue-500';
+    if (s === 'EN REVISIÓN' || s === 'EN REVISION') return 'bg-amber-500';
+    if (s === 'NOTIFICADO') return 'bg-purple-500';
+    if (s === 'AUDIENCIA PROGRAMADA') return 'bg-indigo-500';
+    if (s === 'AUDIENCIA REALIZADA') return 'bg-teal-500';
+    if (s === 'PASÓ A JURÍDICO' || s === 'PASO A JURIDICO' || s.includes('JURÍDIC') || s.includes('JURIDIC')) return 'bg-rose-500';
+    if (s === 'RESUELTO' || s.includes('RESUELT')) return 'bg-emerald-500';
+    if (s === 'ARCHIVADO' || s.includes('ARCHIV')) return 'bg-gray-400';
+    return 'bg-gray-400';
   };
 
   const getTimelineIcon = (status: string) => {

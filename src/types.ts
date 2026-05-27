@@ -10,6 +10,7 @@ export interface Expediente {
   telefono: string;
   localidad: string;
   rubro: string;
+  categoria: string;
   motivos: string;
   denunciada1: string;
   denunciada2: string;

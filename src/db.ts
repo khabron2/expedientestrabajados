@@ -203,15 +203,15 @@ export class Database {
       lastSync: string;
     }>(STORAGE_KEYS.SHEETS_SYNC, {
       sheetUrl: 'https://docs.google.com/spreadsheets/d/1PGWdjVkGvTCJdYjYWlMcyvQwpgF5_jW9P9Tib47Faak/edit?usp=sharing',
-      sheetWebhook: 'https://script.google.com/macros/s/AKfycbxIVrY4x4Znyr5u0tj7r1Fgs-CrLcSlo1BkbTElC3xB0CMgUL3ljY-BFNBa3onEwS9iZw/exec',
+      sheetWebhook: 'https://script.google.com/macros/s/AKfycbwdpQTPDnY9lDI_O5DIvqaEtCOIfzmIw1mwuCHEYxFigs85vPhMdtoqxJvR6od6bFSJcw/exec',
       syncOnAction: true,
       lastSync: 'Listo para primera sincronización'
     });
 
     let keysUpdated = false;
     // Update either empty or old URL to the new one
-    if (!config.sheetWebhook || config.sheetWebhook === '' || config.sheetWebhook.includes('AKfycbzFOiryxyO0A7gNLaEsqj6ZTVN3sWeeZJtFtIW9P82uP-3XNRFyrRBc4phF1LBMJtxC') || config.sheetWebhook.includes('AKfycbweBG-YNcJLeEjR2mAU66TGPm8bow-x5ThUTIjQMc-iuj5Ok3ST4-33XKI8CsTJoORqUQ') || config.sheetWebhook.includes('AKfycbxqZW12VRL3KNUDIvxN6ywG3PvXGt8huZw7wcjF-BonCg1U0qHyKKC79i4ZwC7NvvLM-g')) {
-      config.sheetWebhook = 'https://script.google.com/macros/s/AKfycbxIVrY4x4Znyr5u0tj7r1Fgs-CrLcSlo1BkbTElC3xB0CMgUL3ljY-BFNBa3onEwS9iZw/exec';
+    if (!config.sheetWebhook || config.sheetWebhook === '' || config.sheetWebhook.includes('AKfycbzFOiryxyO0A7gNLaEsqj6ZTVN3sWeeZJtFtIW9P82uP-3XNRFyrRBc4phF1LBMJtxC') || config.sheetWebhook.includes('AKfycbweBG-YNcJLeEjR2mAU66TGPm8bow-x5ThUTIjQMc-iuj5Ok3ST4-33XKI8CsTJoORqUQ') || config.sheetWebhook.includes('AKfycbxqZW12VRL3KNUDIvxN6ywG3PvXGt8huZw7wcjF-BonCg1U0qHyKKC79i4ZwC7NvvLM-g') || config.sheetWebhook.includes('AKfycbxIVrY4x4Znyr5u0tj7r1Fgs-CrLcSlo1BkbTElC3xB0CMgUL3ljY-BFNBa3onEwS9iZw')) {
+      config.sheetWebhook = 'https://script.google.com/macros/s/AKfycbwdpQTPDnY9lDI_O5DIvqaEtCOIfzmIw1mwuCHEYxFigs85vPhMdtoqxJvR6od6bFSJcw/exec';
       keysUpdated = true;
     }
     if (!config.sheetUrl || config.sheetUrl.includes('1BxiM_snv_681Jw2P9s13L7t8Xg6gX')) {
@@ -622,26 +622,44 @@ export class Database {
         ? `${config.sheetWebhook}&action=read` 
         : `${config.sheetWebhook}?action=read`;
 
-      console.log(`[Google Sheets Pull] GET requested to proxy for: ${url}`);
-      const proxyResponse = await fetch('/api/sheets-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: url,
-          method: 'GET'
-        })
-      });
-      
-      if (!proxyResponse.ok) {
-        throw new Error(`Error en el proxy de conexión (Código: ${proxyResponse.status})`);
-      }
-      
-      const proxyData = await proxyResponse.json();
-      if (!proxyData.success) {
-        throw new Error(proxyData.error || 'Error al recuperar datos desde la importación del proxy.');
+      let payload: any;
+      try {
+        console.log(`[Google Sheets Pull] GET requested to proxy for: ${url}`);
+        const proxyResponse = await fetch('/api/sheets-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url,
+            method: 'GET'
+          })
+        });
+        
+        if (!proxyResponse.ok) {
+          throw new Error(`Error en el proxy de conexión (Código: ${proxyResponse.status})`);
+        }
+        
+        const proxyData = await proxyResponse.json();
+        if (!proxyData.success) {
+          throw new Error(proxyData.error || 'Error al recuperar datos desde la importación del proxy.');
+        }
+        payload = proxyData.data;
+      } catch (proxyError: any) {
+        console.warn(`[Google Sheets Pull] Proxy failed (${proxyError.message || proxyError}), trying direct GET connection fallback...`);
+        try {
+          const directResponse = await fetch(url, {
+            method: 'GET'
+          });
+          if (!directResponse.ok) {
+            throw new Error(`Error en conexión directa fallback (Código: ${directResponse.status})`);
+          }
+          payload = await directResponse.json();
+          console.log(`[Google Sheets Pull] Direct fallback fetched correctly from: ${url}`);
+        } catch (directError: any) {
+          console.error(`[Google Sheets Pull] Direct fallback failed as well: ${directError.message || directError}`);
+          throw new Error(proxyError.message || String(proxyError));
+        }
       }
 
-      const payload = proxyData.data;
       if (Array.isArray(payload)) {
         const validatedList: Expediente[] = payload.map(item => ({
           reclamo: String(item.reclamo || '').trim().toUpperCase(),
@@ -651,6 +669,7 @@ export class Database {
           telefono: String(item.telefono || '').trim(),
           localidad: String(item.localidad || '').trim(),
           rubro: String(item.rubro || '').trim(),
+          categoria: String(item.categoria || '').trim(),
           motivos: String(item.motivos || '').trim(),
           denunciada1: String(item.denunciada1 || '').trim(),
           denunciada2: String(item.denunciada2 || '').trim(),
@@ -703,26 +722,44 @@ export class Database {
         ? `${config.sheetWebhook}&action=read_users` 
         : `${config.sheetWebhook}?action=read_users`;
 
-      console.log(`[Google Sheets Pull Users] GET requested to proxy for: ${url}`);
-      const proxyResponse = await fetch('/api/sheets-proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: url,
-          method: 'GET'
-        })
-      });
-      
-      if (!proxyResponse.ok) {
-        throw new Error(`Error en el proxy de conexión (Código: ${proxyResponse.status})`);
-      }
-      
-      const proxyData = await proxyResponse.json();
-      if (!proxyData.success) {
-        throw new Error(proxyData.error || 'Error al recuperar usuarios desde la importación del proxy.');
+      let payload: any;
+      try {
+        console.log(`[Google Sheets Pull Users] GET requested to proxy for: ${url}`);
+        const proxyResponse = await fetch('/api/sheets-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url,
+            method: 'GET'
+          })
+        });
+        
+        if (!proxyResponse.ok) {
+          throw new Error(`Error en el proxy de conexión (Código: ${proxyResponse.status})`);
+        }
+        
+        const proxyData = await proxyResponse.json();
+        if (!proxyData.success) {
+          throw new Error(proxyData.error || 'Error al recuperar usuarios desde la importación del proxy.');
+        }
+        payload = proxyData.data;
+      } catch (proxyError: any) {
+        console.warn(`[Google Sheets Pull Users] Proxy failed (${proxyError.message || proxyError}), trying direct GET connection fallback...`);
+        try {
+          const directResponse = await fetch(url, {
+            method: 'GET'
+          });
+          if (!directResponse.ok) {
+            throw new Error(`Error en conexión directa fallback (Código: ${directResponse.status})`);
+          }
+          payload = await directResponse.json();
+          console.log(`[Google Sheets Pull Users] Direct fallback fetched correctly from: ${url}`);
+        } catch (directError: any) {
+          console.error(`[Google Sheets Pull Users] Direct fallback failed as well: ${directError.message || directError}`);
+          throw new Error(proxyError.message || String(proxyError));
+        }
       }
 
-      const payload = proxyData.data;
       if (Array.isArray(payload)) {
         const validatedList: (Usuario & { clave: string })[] = payload.map(item => ({
           id: String(item.id || `u-${Math.random().toString(36).substr(2, 9)}`),

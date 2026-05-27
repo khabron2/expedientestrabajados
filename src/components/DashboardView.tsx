@@ -1,42 +1,81 @@
 import React, { useState, useMemo } from 'react';
 import { Database, formatDate } from '../db';
 import { Expediente, AuditoriaLog, EstadoExpediente } from '../types';
-import { BarChart3, TrendingUp, Calendar, AlertCircle, Bookmark, CheckCircle2, FileSpreadsheet, Users, Activity, Filter, RefreshCw } from 'lucide-react';
+import { BarChart3, TrendingUp, Calendar, Bookmark, CheckCircle2, Users, Activity, Filter, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export function DashboardView() {
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
 
   // Loaded database
   const expedientes = Database.getExpedientes();
   const auditoria = Database.getAuditorias();
 
+  // Extract all unique years from expedientes
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<number>();
+    expedientes.forEach(exp => {
+      const cleanReclamo = exp.reclamo || '';
+      const nums = cleanReclamo.match(/\d+/g)?.map(Number) || [];
+      const yearInReclamo = nums.find(n => n >= 1990 && n <= 2100);
+      if (yearInReclamo) {
+        yearsSet.add(yearInReclamo);
+      } else {
+        const updateDate = exp.fechaActualizacion ? new Date(exp.fechaActualizacion) : null;
+        if (updateDate && !isNaN(updateDate.getTime())) {
+          yearsSet.add(updateDate.getFullYear());
+        }
+      }
+    });
+    if (yearsSet.size === 0) {
+      yearsSet.add(new Date().getFullYear());
+    }
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  }, [expedientes]);
+
+  const latestYear = useMemo(() => {
+    return availableYears[0]?.toString() || new Date().getFullYear().toString();
+  }, [availableYears]);
+
+  const yearToFilter = selectedYear || latestYear;
+
   // Filtered dataset
   const filteredExpedientes = useMemo(() => {
     return expedientes.filter(exp => {
-      const updateDate = exp.fechaActualizacion ? new Date(exp.fechaActualizacion) : null;
-      if (!updateDate) return true;
-      
-      const targetTime = updateDate.getTime();
-      if (startDate) {
-        const startSec = new Date(startDate).getTime();
-        if (targetTime < startSec) return false;
+      if (yearToFilter === 'TODOS') return true;
+
+      const cleanReclamo = exp.reclamo || '';
+      const nums = cleanReclamo.match(/\d+/g)?.map(Number) || [];
+      const yearInReclamo = nums.find(n => n >= 1990 && n <= 2100);
+      let expYear = 0;
+      if (yearInReclamo) {
+        expYear = yearInReclamo;
+      } else {
+        const updateDate = exp.fechaActualizacion ? new Date(exp.fechaActualizacion) : null;
+        if (updateDate && !isNaN(updateDate.getTime())) {
+          expYear = updateDate.getFullYear();
+        }
       }
-      if (endDate) {
-        // add 1 day to include the end date fully
-        const endSec = new Date(endDate).getTime() + (24 * 60 * 60 * 1000);
-        if (targetTime > endSec) return false;
-      }
-      return true;
+
+      return expYear.toString() === yearToFilter;
     });
-  }, [expedientes, startDate, endDate]);
+  }, [expedientes, yearToFilter]);
 
   // Compute status totals
   const stats = useMemo(() => {
+    const isClosed = (estado: string) => {
+      const normalized = (estado || '').toLowerCase().trim();
+      return (
+        normalized === 'resuelto' ||
+        normalized === 'archivado' ||
+        normalized.includes('archiv') ||
+        normalized.includes('resuelt')
+      );
+    };
+
     const total = filteredExpedientes.length;
-    const abiertos = filteredExpedientes.filter(e => e.estado !== 'RESUELTO' && e.estado !== 'ARCHIVADO').length;
-    const cerrados = filteredExpedientes.filter(e => e.estado === 'RESUELTO' || e.estado === 'ARCHIVADO').length;
+    const cerrados = filteredExpedientes.filter(e => isClosed(e.estado)).length;
+    const abiertos = total - cerrados;
     const enJuridico = filteredExpedientes.filter(e => e.estado === 'PASÓ A JURÍDICO').length;
     const conAudienciaProg = filteredExpedientes.filter(e => e.estado === 'AUDIENCIA PROGRAMADA').length;
 
@@ -81,16 +120,28 @@ export function DashboardView() {
     };
 
     filteredExpedientes.forEach(e => {
-      if (counts[e.estado] !== undefined) {
-        counts[e.estado]++;
+      const lower = (e.estado || '').toLowerCase().trim();
+      if (lower.includes('archiv')) {
+        counts['ARCHIVADO']++;
+      } else if (lower.includes('resuelt')) {
+        counts['RESUELTO']++;
+      } else if (counts[e.estado] !== undefined) {
+        if (e.estado !== 'NOTIFICADO') {
+          counts[e.estado]++;
+        }
       }
     });
 
-    return Object.entries(counts).map(([name, count]) => ({
-      name,
-      count,
-      pct: stats.total ? Math.round((count / stats.total) * 100) : 0
-    }));
+    // Count cases with a return receipt (notificacionVuelta is not empty)
+    counts['NOTIFICADO'] = filteredExpedientes.filter(e => e.notificacionVuelta && e.notificacionVuelta.trim() !== '').length;
+
+    return Object.entries(counts)
+      .filter(([name]) => ['NOTIFICADO', 'AUDIENCIA PROGRAMADA', 'ARCHIVADO'].includes(name))
+      .map(([name, count]) => ({
+        name,
+        count,
+        pct: stats.total ? Math.round((count / stats.total) * 100) : 0
+      }));
   }, [filteredExpedientes, stats.total]);
 
   const recentAudits = useMemo(() => {
@@ -99,8 +150,7 @@ export function DashboardView() {
 
   // Refresh filters helper
   const clearFilters = () => {
-    setStartDate('');
-    setEndDate('');
+    setSelectedYear('TODOS');
   };
 
   return (
@@ -112,35 +162,38 @@ export function DashboardView() {
           <p className="text-slate-500 text-xs font-sans mt-1">Supervisión integral de sumarios judiciales, expedientes conciliatorios e indicadores de rendimiento.</p>
         </div>
 
-        {/* Date Filter Component */}
+        {/* Year Filter Component */}
         <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-1.5 px-3 border-r border-slate-100 text-slate-400">
             <Filter className="w-3.5 h-3.5" />
-            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Filtros</span>
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Filtro Año</span>
           </div>
           <div className="flex items-center gap-2">
-            <input 
-              type="date" 
-              className="bg-slate-50 border border-slate-100 rounded-lg text-xs py-1 px-2 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans" 
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              title="Fecha Inicial"
-            />
-            <span className="text-xs text-slate-400">a</span>
-            <input 
-              type="date" 
-              className="bg-slate-50 border border-slate-100 rounded-lg text-xs py-1 px-2 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans" 
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              title="Fecha Límite"
-            />
+            <select 
+              className="bg-slate-50 border border-slate-100 rounded-lg text-xs py-1 px-3 focus:outline-none focus:ring-1 focus:ring-amber-500 font-sans outline-none font-semibold text-slate-700 cursor-pointer" 
+              value={yearToFilter}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              title="Seleccionar Año"
+            >
+              {availableYears.map(year => (
+                <option key={year} value={year.toString()}>{year} ({expedientes.filter(exp => {
+                  const cleanReclamo = exp.reclamo || '';
+                  const nums = cleanReclamo.match(/\d+/g)?.map(Number) || [];
+                  const expYear = nums.find(n => n >= 1990 && n <= 2100) || (exp.fechaActualizacion ? new Date(exp.fechaActualizacion).getFullYear() : new Date().getFullYear());
+                  return expYear === year;
+                }).length})</option>
+              ))}
+              <option value="TODOS">TODOS LOS AÑOS ({expedientes.length})</option>
+            </select>
           </div>
-          {(startDate || endDate) && (
+          {selectedYear && selectedYear !== 'TODOS' && (
             <button 
               onClick={clearFilters}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1"
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded-lg text-[10px] font-semibold flex items-center gap-1"
+              title="Limpiar filtro"
             >
               <RefreshCw className="w-3 h-3" />
+              <span>Ver Todos</span>
             </button>
           )}
         </div>
@@ -194,29 +247,6 @@ export function DashboardView() {
           </div>
           <div className="bg-indigo-50 text-indigo-600 p-3 rounded-xl">
             <Calendar className="w-5 h-5" />
-          </div>
-        </div>
-      </div>
-
-      {/* Row of Secondary KPI (Juridico and notifications) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-center gap-4">
-          <div className="bg-rose-250 bg-rose-500 text-white p-2.5 rounded-lg">
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <div>
-            <h5 className="font-sans font-bold text-rose-900 text-sm">Fase Sumarial Abierta (Área Jurídica): {stats.enJuridico}</h5>
-            <p className="text-rose-700 text-xs mt-0.5">Expedientes imputados formalmente por presuntas infracciones sin posibilidad de conciliación.</p>
-          </div>
-        </div>
-
-        <div className="bg-purple-50 border border-purple-100 p-4 rounded-xl flex items-center gap-4">
-          <div className="bg-purple-500 text-white p-2.5 rounded-lg">
-            <FileSpreadsheet className="w-5 h-5" />
-          </div>
-          <div>
-            <h5 className="font-sans font-bold text-purple-900 text-sm">Notificaciones Expedidas: {stats.cantNotificaciones}</h5>
-            <p className="text-purple-700 text-xs mt-0.5">Expedientes despachados formalmente con cédulas de notificación de denuncias a firmas comerciales.</p>
           </div>
         </div>
       </div>
@@ -301,6 +331,11 @@ export function DashboardView() {
                   <span className="font-sans font-bold text-[10px] tracking-tight uppercase leading-none block truncate">
                     {st.name}
                   </span>
+                  {st.name === 'NOTIFICADO' && (
+                    <span className="text-[8px] font-mono font-bold uppercase tracking-wider opacity-75 mt-1 block">
+                      Notificación Vuelta
+                    </span>
+                  )}
                   <div className="flex items-baseline justify-between mt-2">
                     <span className="text-xl font-black">{st.count}</span>
                     <span className="font-mono text-[9px] font-black opacity-70">

@@ -121,7 +121,12 @@ export function AudienciasView({ currentUserRol, currentUsername, addToast, sync
 
   // List of expedientes without any hearings scheduled yet (for the scheduling selector)
   const availableExpedientesForHearing = useMemo(() => {
-    return expedientes.filter(exp => !exp.audiencia && exp.estado !== 'RESUELTO' && exp.estado !== 'ARCHIVADO');
+    return expedientes.filter(exp => {
+      if (exp.audiencia) return false;
+      const lower = (exp.estado || '').toLowerCase().trim();
+      const isClosed = lower === 'resuelto' || lower === 'archivado' || lower.includes('archiv') || lower.includes('resuelt');
+      return !isClosed;
+    });
   }, [expedientes]);
 
   // Submit assign handler

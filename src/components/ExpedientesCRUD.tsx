@@ -139,6 +139,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
     telefono: '',
     localidad: '',
     rubro: 'Telecomunicaciones',
+    categoria: '',
     motivos: '',
     denunciada1: '',
     denunciada2: '',
@@ -174,7 +175,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
 
   // Filters logic
   const filteredList = useMemo(() => {
-    return expedientes.filter(exp => {
+    const list = expedientes.filter(exp => {
       // search match
       const searchStr = `${exp.reclamo} ${exp.apellido} ${exp.nombre} ${exp.dni} ${exp.denunciada1}`.toLowerCase();
       const matchSearch = searchStr.includes(searchTerm.toLowerCase());
@@ -190,6 +191,36 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
 
       return matchSearch && matchEstado && matchRubro && matchLocalidad;
     });
+
+    // Sort: newest to oldest based on year and sequence numbers in reclamo field, with update date descending as fallback
+    return list.sort((a, b) => {
+      const cleanA = a.reclamo || '';
+      const cleanB = b.reclamo || '';
+
+      const numsA = cleanA.match(/\d+/g)?.map(Number) || [];
+      const numsB = cleanB.match(/\d+/g)?.map(Number) || [];
+
+      // Extract high probability 4-digit year (range 1990 to 2100)
+      const yearA = numsA.find(n => n >= 1990 && n <= 2100) || 0;
+      const yearB = numsB.find(n => n >= 1990 && n <= 2100) || 0;
+
+      if (yearA !== yearB) {
+        return yearB - yearA; // Higher year first
+      }
+
+      // If years are identical (or both missing), compare sequence number
+      const seqA = numsA.filter(n => n !== yearA)[0] ?? numsA[0] ?? 0;
+      const seqB = numsB.filter(n => n !== yearB)[0] ?? numsB[0] ?? 0;
+
+      if (seqA !== seqB) {
+        return seqB - seqA; // Higher sequence first
+      }
+
+      // Default fallback: latest update date first
+      const timeA = new Date(a.fechaActualizacion || 0).getTime();
+      const timeB = new Date(b.fechaActualizacion || 0).getTime();
+      return timeB - timeA;
+    });
   }, [expedientes, searchTerm, filterEstado, filterRubro, filterLocalidad]);
 
   // Pagination totals
@@ -200,17 +231,16 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
   }, [filteredList, currentPage]);
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'INGRESADO': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'EN REVISIÓN': return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'NOTIFICADO': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'AUDIENCIA PROGRAMADA': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
-      case 'AUDIENCIA REALIZADA': return 'bg-teal-100 text-teal-800 border-teal-200';
-      case 'PASÓ A JURÍDICO': return 'bg-rose-100 text-rose-800 border-rose-200';
-      case 'RESUELTO': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 'ARCHIVADO': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+    const s = (status || '').toUpperCase().trim();
+    if (s === 'INGRESADO') return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (s === 'EN REVISIÓN' || s === 'EN REVISION') return 'bg-amber-100 text-amber-800 border-amber-200';
+    if (s === 'NOTIFICADO') return 'bg-purple-100 text-purple-800 border-purple-200';
+    if (s === 'AUDIENCIA PROGRAMADA') return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+    if (s === 'AUDIENCIA REALIZADA') return 'bg-teal-100 text-teal-800 border-teal-200';
+    if (s === 'PASÓ A JURÍDICO' || s === 'PASO A JURIDICO' || s.includes('JURÍDIC') || s.includes('JURIDIC')) return 'bg-rose-100 text-rose-800 border-rose-200';
+    if (s === 'RESUELTO' || s.includes('RESUELT')) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (s === 'ARCHIVADO' || s.includes('ARCHIV')) return 'bg-gray-100 text-gray-800 border-gray-200';
+    return 'bg-gray-100 text-gray-800 border-gray-200';
   };
 
   // CRUD actions triggers
@@ -229,6 +259,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
       telefono: '',
       localidad: '',
       rubro: 'Telecomunicaciones',
+      categoria: '',
       motivos: '',
       denunciada1: '',
       denunciada2: '',
@@ -257,6 +288,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
       telefono: exp.telefono,
       localidad: exp.localidad,
       rubro: exp.rubro,
+      categoria: exp.categoria || '',
       motivos: exp.motivos,
       denunciada1: exp.denunciada1,
       denunciada2: exp.denunciada2,
@@ -339,13 +371,13 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
   const exportToExcelCSV = () => {
     // Generate CSV contents
     const headers = [
-      'RECLAMO', 'APELLIDO', 'NOMBRE', 'DNI', 'TELEFONO', 'LOCALIDAD', 'RUBRO', 
+      'RECLAMO', 'APELLIDO', 'NOMBRE', 'DNI', 'TELEFONO', 'LOCALIDAD', 'RUBRO', 'CATEGORIA', 
       'MOTIVOS', 'DENUNCIADA 1', 'DENUNCIADA 2', 'DENUNCIADA 3', 'DENUNCIADA 4',
       'NOTIFICACION SALE', 'NOTIFICACION VUELTA', 'AUDIENCIA', 'ESTADO', 'MODIFICADOR', 'ACTUALIZACION'
     ];
 
     const rows = filteredList.map(e => [
-      e.reclamo, e.apellido, e.nombre, e.dni, e.telefono, e.localidad, e.rubro,
+      e.reclamo, e.apellido, e.nombre, e.dni, e.telefono, e.localidad, e.rubro, `"${(e.categoria || '').replace(/"/g, '""')}"`,
       `"${e.motivos.replace(/"/g, '""')}"`, e.denunciada1, e.denunciada2 || '', e.denunciada3 || '', e.denunciada4 || '',
       e.notificacionSale || '', e.notificacionVuelta || '', e.audiencia || '', e.estado, e.usuario, e.fechaActualizacion
     ]);
@@ -434,6 +466,10 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
             <div>
               <div class="section-lbl">Rubro Registrado de Reclamo</div>
               <div class="section-val">${exp.rubro}</div>
+            </div>
+            <div>
+              <div class="section-lbl">Categoría del Reclamo</div>
+              <div class="section-val">${exp.categoria || 'Sin clasificar'}</div>
             </div>
             <div>
               <div class="section-lbl">Estado Legal en Curso</div>
@@ -619,9 +655,9 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/55 text-slate-500 text-[10px] font-mono uppercase tracking-wider">
                 <th className="py-3 px-5 font-bold">Identificación / Titular</th>
-                <th className="py-3 px-4 font-bold">Rubro / Conflictos</th>
                 <th className="py-3 px-4 font-bold">Organismo Denunciado</th>
-                <th className="py-3 px-4 font-bold">Fase / Proveído Principal</th>
+                <th className="py-3 px-4 font-bold">Estado</th>
+                <th className="py-3 px-4 font-bold">Audiencias</th>
                 <th className="py-3 px-4 font-bold">Cédula Notificación</th>
                 <th className="py-3 px-5 font-bold text-right text-slate-900">Acciones administrativas</th>
               </tr>
@@ -644,16 +680,6 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                       <div className="font-mono text-[9px] text-slate-400 mt-0.5">DNI: {exp.dni}</div>
                     </td>
 
-                    {/* Sector / motiviations */}
-                    <td className="py-3.5 px-4 max-w-xs">
-                      <div className="font-mono text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 inline-block font-bold mb-1">
-                        {exp.rubro}
-                      </div>
-                      <p className="text-slate-500 text-xs font-sans line-clamp-1 italic">
-                        "{exp.motivos}"
-                      </p>
-                    </td>
-
                     {/* Denunciado */}
                     <td className="py-3.5 px-4 font-semibold text-slate-800">
                       <div className="truncate max-w-[150px]" title={exp.denunciada1}>
@@ -667,14 +693,21 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                     </td>
 
                     {/* Status Badge */}
-                    <td className="py-3.5 px-4">
+                    <td className="py-3.5 px-4 font-bold">
                       <span className={`px-2.5 py-1 text-[9px] font-extrabold tracking-wider rounded-lg border uppercase inline-block ${getStatusBadge(exp.estado)}`}>
                         {exp.estado}
                       </span>
-                      {cleanLegacyDateToEmpty(exp.audiencia) && (
-                        <div className="text-[9px] text-slate-500 font-semibold mt-1 flex items-center gap-1 bg-slate-50 px-1 py-0.5 rounded border border-slate-150 max-w-[130px] truncate" title={exp.audiencia}>
-                          <span className="font-extrabold text-blue-600">Obs:</span> {exp.audiencia}
+                    </td>
+
+                    {/* Audiencias */}
+                    <td className="py-3.5 px-4">
+                      {cleanLegacyDateToEmpty(exp.audiencia) ? (
+                        <div className="text-[10px] text-slate-700 font-mono bg-blue-50/70 border border-blue-100 rounded-lg px-2 py-1 max-w-[160px] inline-flex items-center gap-1.5" title={exp.audiencia}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                          <span className="font-bold">{exp.audiencia}</span>
                         </div>
+                      ) : (
+                        <span className="text-slate-400 text-[10px] italic">Sin audiencia</span>
                       )}
                     </td>
 
@@ -859,7 +892,7 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                 </div>
 
                 {/* Conflict specs */}
-                <div className="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-slate-700 font-bold mb-1">Rubro de la denuncia</label>
                     <select
@@ -877,6 +910,17 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                       <option value="Electrodomésticos">Electrodomésticos</option>
                       <option value="Otros">Otros</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-700 font-bold mb-1">Categoría</label>
+                    <input
+                      type="text"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:ring-1 focus:ring-amber-500 focus:bg-white outline-none"
+                      placeholder="ej: Tarjetas, Facturación, etc."
+                      value={formData.categoria}
+                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                    />
                   </div>
 
                   <div>
@@ -1065,8 +1109,40 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                   </div>
                 </div>
 
+                {/* Classification parameters */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 border-t border-slate-100 pt-4">
+                  <div>
+                    <label className="block text-slate-700 text-xs mb-1 font-bold">Rubro de la denuncia</label>
+                    <select
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none text-xs"
+                      value={formData.rubro}
+                      onChange={(e) => setFormData({ ...formData, rubro: e.target.value })}
+                    >
+                      <option value="Telecomunicaciones">Telecomunicaciones</option>
+                      <option value="Servicios Públicos">Servicios Públicos</option>
+                      <option value="Comercio Electrónico">Comercio Electrónico</option>
+                      <option value="Bancos y Financieras">Bancos y Financieras</option>
+                      <option value="Turismo y Pasajes">Turismo y Pasajes</option>
+                      <option value="Fintech">Fintech</option>
+                      <option value="Salud y Medicina">Salud y Medicina</option>
+                      <option value="Electrodomésticos">Electrodomésticos</option>
+                      <option value="Otros">Otros</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 text-xs mb-1 font-bold">Categoría del Reclamo</label>
+                    <input
+                      type="text"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:bg-white text-xs"
+                      placeholder="ej: Tarjetas, Facturación, etc."
+                      value={formData.categoria}
+                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 {/* Notifications & Audencias Details */}
-                <div className="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div className="border-t border-slate-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
                     <label className="block text-slate-700 text-xs mb-1">Cédula Sale (Fecha)</label>
                     <input
@@ -1077,22 +1153,12 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-700 text-xs mb-1">Cédula Vuelta (Fecha)</label>
+                    <label className="block text-slate-700 text-xs mb-1">Notificado</label>
                     <input
                       type="date"
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none text-xs focus:bg-white font-mono"
                       value={formData.notificacionVuelta}
                       onChange={(e) => setFormData({ ...formData, notificacionVuelta: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-slate-700 text-xs mb-1">Observaciones</label>
-                    <input
-                      type="text"
-                      placeholder="Sin observaciones"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none text-xs focus:bg-white"
-                      value={formData.audiencia}
-                      onChange={(e) => setFormData({ ...formData, audiencia: e.target.value })}
                     />
                   </div>
                 </div>
@@ -1169,6 +1235,8 @@ export function ExpedientesCRUD({ currentUserRol, currentUsername, addToast, syn
                     <div><strong>DNI:</strong> {selectedExp.dni}</div>
                     <div><strong>Teléfono:</strong> {selectedExp.telefono || 'Sin datos'}</div>
                     <div><strong>Hometown:</strong> {selectedExp.localidad || 'S/D'}</div>
+                    <div><strong>Rubro:</strong> {selectedExp.rubro}</div>
+                    <div><strong>Categoría:</strong> {selectedExp.categoria || 'Sin clasificar'}</div>
                     <div><strong>Última firma:</strong> {selectedExp.usuario}</div>
                   </div>
                 </div>
